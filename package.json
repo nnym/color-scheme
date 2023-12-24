@@ -1,0 +1,19 @@
+{
+	"name": "color-scheme",
+	"type": "module",
+	"module": "main.ts",
+	"scripts": {
+		"bundle": "bun build main.ts --minify --outfile .build/main.js",
+		"dev": "bun bundle && xdg-open index.html && bun bundle --watch"
+	},
+	"devDependencies": {
+		"bun-types": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5.0.0"
+	},
+	"dependencies": {
+		"codemirror": "^6.0.1",
+		"@codemirror/lang-cpp": "^6.0.2"
+	}
+}

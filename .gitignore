@@ -1,0 +1,4 @@
+.*
+!.gitignore
+*.lock*
+node_modules
