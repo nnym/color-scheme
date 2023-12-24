@@ -1,4 +1,5 @@
 .*
 !.gitignore
+!.github
 *.lock*
 node_modules

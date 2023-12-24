@@ -1,0 +1,31 @@
+name: deploy
+
+on:
+  push:
+    branches: ["a"]
+  pull_request:
+    branches: ["a"]
+
+permissions:
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/configure-pages@v4
+    - uses: oven-sh/setup-bun@v1
+
+    - name: build
+      run: |
+        bun install
+        bun bundle
+
+    - uses: actions/upload-pages-artifact@v3
+      with:
+        path: .
+
+    - uses: actions/deploy-pages@v4
