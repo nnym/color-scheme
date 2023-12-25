@@ -126,6 +126,8 @@ const view = new cmv.EditorView({
 	extensions: [
 		colorCompartment.of([]),
 		cpp(),
+		cml.indentUnit.of("\t"),
+		cmv.keymap.of([cmc.indentWithTab]),
 		cm.basicSetup
 	],
 	doc: `
