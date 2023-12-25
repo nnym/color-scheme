@@ -16,38 +16,41 @@
 			color: #afbfbf;
 		}
 
-		aside {
-			display: grid;
+		#options {
 			min-width: 25em;
 			height: 100%;
 			overflow: auto;
 			box-sizing: border-box;
-			grid-template-columns: auto auto auto;
-			gap: 1em;
-			padding: 1em;
 			margin: 0;
+			padding: 1em;
 			scroll-margin: 0;
 		}
 
-		aside input {
+		input {
 			background: inherit;
 			color: inherit;
 			padding: 0;
+			border: 1px solid;
 			justify-self: end;
 		}
 
-		aside input:focus-visible {
-			outline: 2px solid;
+		:focus-visible {outline: 2px solid}
+
+		#colors, #editor {
+			display: grid;
+			row-gap: 0.25em;
+			column-gap: 1em;
 		}
 
-		aside input[type=text] {
-			width: 7em;
-			border: 1px solid;
+		#editor {
+			grid-template-columns: auto auto;
+			margin-bottom: 2.5em;
 		}
 
-		aside input[type=color] {
-			border: none;
-		}
+		#colors {grid-template-columns: auto auto auto}
+
+		#colors input[type=text] {width: 7em}
+		#colors input[type=color] {border: none}
 
 		.cm-editor {
 			flex-grow: 1;
@@ -60,17 +63,18 @@
 			color: #888;
 		}
 
-		.cm-editor .cm-activeLine {
-			background: #323232;
-		}
-
-		.cm-editor .cm-activeLineGutter {
-			background: #323232;
-		}
+		.cm-editor .cm-activeLine {background: #323232}
+		.cm-editor .cm-activeLineGutter {background: #323232}
 	</style>
 </head>
 
 <body>
-	<aside></aside>
+	<div id=options>
+		<section id=editor>
+			font family <input id=font-family type=text value="monospace" onchange="setFontFamily()">
+			font size <input id=font-size type=number value=16 min=1 oninput=setFontSize()>
+		</section>
+		<section id=colors></section>
+	</div>
 </body>
 </html>

@@ -3,7 +3,8 @@
 	"type": "module",
 	"module": "main.ts",
 	"scripts": {
-		"bundle": "bun build main.ts --minify --outfile .build/main.js",
+		"bundle": "bun build main.ts --outfile .build/main.js",
+		"minify": "bun bundle --minify",
 		"dev": "bun bundle && xdg-open index.html && bun bundle --watch"
 	},
 	"devDependencies": {

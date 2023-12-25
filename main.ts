@@ -10,7 +10,16 @@ import * as cmv from "@codemirror/view";
 import * as cmse from "@codemirror/search";
 import {tags} from "@lezer/highlight";
 
+declare global {
+	interface Window {
+		setFontFamily: () => Promise<void>;
+		setFontSize: () => void;
+	}
+}
+
 const {log} = console;
+// @ts-ignore
+const $ = (...args) => document.querySelector(...args) as HTMLElement;
 
 const gray = "808080";
 const gray05 = "d8d8d8";
@@ -153,35 +162,54 @@ const view = new cmv.EditorView({
 	`.replaceAll(/(?<=\n)\t{2}/g, "").trim()
 });
 
+window.setFontFamily = async () => {
+	const input = $("#font-family") as HTMLInputElement;
+	input.value = input.value.trim();
+	const style = $(".cm-scroller")!.style;
+
+	if (!["", "serif", "sans-serif", "monospace"].includes(input.value.toLowerCase())) {
+		const fonts = await document.fonts.ready;
+		const urlPrefix = "https://fonts.googleapis.com/css?family=";
+		const correctedURL = urlPrefix + input.value.replaceAll(/(?<=\b)\p{L}/gu, m => m[0].toUpperCase());
+
+		for (const url of new Set([correctedURL, urlPrefix + input.value])) {
+			const link = document.createElement("link");
+			link.rel = "stylesheet";
+			link.href = url;
+			document.head.appendChild(link);
+		}
+	}
+
+	style.fontFamily = input.value + (input.value && ", ") + "monospace";
+};
+
+window.setFontSize = () => {
+	const input = $("#font-size") as HTMLInputElement;
+	input.value = input.value.replaceAll(/[^\d]/g, "");
+	if (input.value.length) $(".cm-content")!.style.fontSize = input.value + "px";
+};
+
 function applyHighlighting() {
 	view.dispatch({effects: colorCompartment.reconfigure(cml.syntaxHighlighting(cml.HighlightStyle.define(
 		Object.entries(colors).map(([name, color]) => ({tag: tags[name], color: "#" + color}))
 	)))});
 }
 
+window.setFontFamily();
+window.setFontSize();
 applyHighlighting();
 
-const sidebar = document.querySelector("aside")!;
+const colorList = $("#colors")!;
 
 for (const name in tags) {
-	const label = document.createElement("span");
-	label.textContent = name.split(/(?<=[a-z])(?=[A-Z\d])/).map(s => s.toLowerCase()).join(" ");
-
 	const hex = document.createElement("input");
 	hex.type = "text";
 	hex.value = "#" + (colors[name] ?? "");
-	hex.minLength = 4;
 	hex.maxLength = 7;
 
 	const color = document.createElement("input");
 	color.type = "color";
 	color.value = hex.value
-
-	color.oninput = e => {
-		hex.value = color.value;
-		colors[name] = hex.value.substring(1);
-		applyHighlighting();
-	};
 
 	hex.oninput = e => {
 		const value = hex.value.trim();
@@ -191,7 +219,13 @@ for (const name in tags) {
 		applyHighlighting();
 	};
 
-	sidebar.appendChild(label);
-	sidebar.appendChild(hex);
-	sidebar.appendChild(color);
+	color.oninput = e => {
+		hex.value = color.value;
+		colors[name] = hex.value.substring(1);
+		applyHighlighting();
+	};
+
+	colorList.appendChild(document.createTextNode(name.split(/(?<=[a-z])(?=[A-Z\d])/).map(s => s.toLowerCase()).join(" ")));
+	colorList.appendChild(hex);
+	colorList.appendChild(color);
 }
