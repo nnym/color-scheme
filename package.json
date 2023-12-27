@@ -3,7 +3,7 @@
 	"type": "module",
 	"module": "main.ts",
 	"scripts": {
-		"bundle": "bun build main.ts --outfile .build/main.js",
+		"bundle": "bun build main.ts --outdir .build",
 		"minify": "bun bundle --minify",
 		"dev": "bun bundle && xdg-open index.html && bun bundle --watch"
 	},
@@ -15,6 +15,6 @@
 	},
 	"dependencies": {
 		"codemirror": "^6.0.1",
-		"@codemirror/lang-cpp": "^6.0.2"
+		"@codemirror/language-data": "^6.3.1"
 	}
 }

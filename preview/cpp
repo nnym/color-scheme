@@ -1,0 +1,72 @@
+#include <algorithm>
+#include <cstdio>
+#include <string>
+
+using std::string;
+
+#define SAFE_ACCESS(p, access) (p ? p->access : decltype(p->access)())
+#define BETWEEN(x, a, b) (x >= a && x <= b)
+
+/** This type represents binary tree nodes.
+    Nodes can have values and be traversed inorder. */
+template<typename T>
+struct Node {
+	T value;
+	Node<T> *left, *right;
+
+	// This constructor assumes ownership of left and right.
+	Node(T value = T(), Node<T> *left = nullptr, Node<T> *right = nullptr) : value(value), left(left), right(right) {}
+
+	void traverseInOrder(auto process) {
+		if (this->left) this->left->traverseInOrder(process);
+		process(*this);
+		if (this->right) this->right->traverseInOrder(process);
+	}
+
+	int depth() {
+		return std::max(SAFE_ACCESS(this->left, depth()), SAFE_ACCESS(this->right, depth())) + 1;
+	}
+
+	~Node() {
+		delete this->left;
+		delete this->right;
+	}
+};
+
+int main() {
+	auto l = new Node("foo");
+	auto rr = new Node("quux");
+	auto r = new Node<const char*>("baz", nullptr, rr);
+	Node root("bar", l, r);
+	root.traverseInOrder([](auto &node) {
+		printf("%d %s\n", node.depth(), node.value);
+	});
+}
+
+string caesar(string text, int shift) {
+	for (auto &c : text) {
+		int base = BETWEEN(c, 'A', 'Z') ? 'A' : BETWEEN(c, 'a', 'z') ? 'a' : 0;
+		if (base) c = (c - base + shift) % 26 + base;
+	}
+
+	return text;
+}
+
+void fizzbuzz() {
+	for (int i = 0; i < 100; i++) {
+		void *n = &&n;
+	
+		if (i % 3 == 0) {
+			fputs("Fizz", stdout);
+			n = &&m;
+		}
+		
+		if (i % 5 == 0) fputs("Buzz", stdout);
+		else {
+			goto *n;
+			n: printf("%d", i);
+		}
+	
+		m: puts("");
+	}
+}
