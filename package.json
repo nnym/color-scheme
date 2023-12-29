@@ -1,7 +1,6 @@
 {
-	"name": "color-scheme",
+	"name": "color-schemer",
 	"type": "module",
-	"module": "main.ts",
 	"scripts": {
 		"bundle": "bun build main.ts --outdir .build",
 		"minify": "bun bundle --minify",
