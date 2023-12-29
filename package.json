@@ -2,9 +2,9 @@
 	"name": "color-schemer",
 	"type": "module",
 	"scripts": {
-		"bundle": "bun build main.ts --outdir .build",
+		"bundle": "mkdir -p .build && ln -sf ../index.html -t .build && bun build main.ts --outdir .build",
 		"minify": "bun bundle --minify",
-		"dev": "bun bundle && xdg-open index.html && bun bundle --watch"
+		"dev": "bun bundle && xdg-open .build/index.html && bun bundle --watch"
 	},
 	"devDependencies": {
 		"bun-types": "latest"
