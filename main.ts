@@ -1,37 +1,58 @@
 import * as cm from "codemirror";
-import * as cma from "@codemirror/autocomplete";
 import * as cmc from "@codemirror/commands";
 import * as cml from "@codemirror/language";
 import {languages} from "@codemirror/language-data";
-import * as cmli from "@codemirror/lint";
 import * as cms from "@codemirror/state";
 import * as cmv from "@codemirror/view";
-import * as cmse from "@codemirror/search";
 import {tags} from "@lezer/highlight";
+import {importSchemes} from "./util" with {type: "macro"};
 
-declare global {
-	interface Window {
-		setFontFamily: () => Promise<void>;
-		setFontSize: () => void;
-		setLanguage: () => void;
-	}
+const editorSchema = {
+	background: null,
+	selection: null,
+	caret: null
+};
+
+export interface Scheme {
+	name: string;
+	editor: {[key in keyof typeof editorSchema]: string | null};
+	syntax: {[key in keyof typeof tags]: string | null}
 }
+
+export interface InternalScheme extends Scheme {
+	default: boolean;
+};
 
 const FONT = "font";
 const FONT_SIZE = "fontSize";
 const LANGUAGE = "language";
+const SCHEME = "scheme";
 
 const {log} = console;
 // @ts-ignore
 const $ = (...args) => document.querySelector(...args) as HTMLElement;
+// @ts-ignore
+const children: (HTMLElement) => HTMLElement[] = e => [...e.children];
+const focusEnd = (e: HTMLInputElement) => {
+	e.focus();
+	e.selectionStart = e.selectionEnd = e.value.length;
+};
 
 const fontFamily = $("#font-family") as HTMLInputElement;
 const fontSize = $("#font-size") as HTMLInputElement;
 const languageSelect = $("#language") as HTMLSelectElement;
+const schemeSelect = $("#scheme") as HTMLSelectElement;
+const schemeName = $("#scheme-name") as HTMLInputElement;
+const defaultGroup = $("optgroup[label=default]");
+const customGroup = $("optgroup[label=custom]");
+const copySchemeButton = $("#copy-scheme") as HTMLButtonElement;
+const renameSchemeButton = $("#rename-scheme") as HTMLButtonElement;
+const removeSchemeButton = $("#remove-scheme") as HTMLButtonElement;
 
 const previewKey = () => "preview/" + languageSelect.value;
+const schemeKey = (scheme: string = schemeSelect.value) => "scheme/" + scheme;
 
-function map<V, T>(o: {[k: string]: V}, mapper: (key: string, value: V) => T): {[k: string]: T} {
+function map<K extends string, V, T>(o: {[k in K]: V}, mapper: (key: K, value: V) => T | [K, T]): {[k in K]: T} {
 	for (let key in o) {
 		let value = mapper(key, o[key]);
 
@@ -43,124 +64,62 @@ function map<V, T>(o: {[k: string]: V}, mapper: (key: string, value: V) => T): {
 		(o as any)[key] = value;
 	}
 
-	return o as any as {string: T};
+	return o as any as {[k in K]: T};
 }
 
-const gray = "#808080";
-const gray01 = "#282828";
-const gray02 = "#383838";
-const gray04 = "#b8b8b8";
-const gray05 = "#d8d8d8";
-const white = "#d0d0d0";
-const yellow = "#eedd82";
-const green = "#32cd32";
-const lightBlue = "#6897bb";
-const darkGreen = "#629755";
-const orange = "#cc7832";
-const purple = "#9876aa";
-const darkRed = "#a34a27";
+const schemes = (await importSchemes()).map(s => ({default: true, ...s})) as InternalScheme[];
 
-const scheme: {[k: string]: {[k: string]: string | null}} = {
-	editor: {
-		background: gray01,
-		selection: gray02,
-		caret: gray04
-	},
-	syntax: {
-		...map({...tags}, _ => null),
-		comment: gray,
-		lineComment: gray,
-		blockComment: gray,
-		docComment: gray,
-		name: white,
-		variableName: white,
-		typeName: orange,
-		tagName: white,
-		propertyName: yellow,
-		attributeName: yellow,
-		className: white,
-		labelName: purple,
-		namespace: purple,
-		macroName: green,
-		literal: lightBlue,
-		string: darkGreen,
-		docString: darkGreen,
-		character: lightBlue,
-		attributeValue: yellow,
-		number: lightBlue,
-		integer: lightBlue,
-		float: lightBlue,
-		bool: lightBlue,
-		regexp: darkGreen,
-		escape: white,
-		color: darkGreen,
-		url: lightBlue,
-		keyword: orange,
-		self: orange,
-		null: lightBlue,
-		atom: null,
-		unit: null,
-		modifier: gray05,
-		operatorKeyword: orange,
-		controlKeyword: orange,
-		definitionKeyword: orange,
-		moduleKeyword: orange,
-		operator: gray05,
-		derefOperator: gray05,
-		arithmeticOperator: gray05,
-		logicOperator: gray05,
-		bitwiseOperator: gray05,
-		compareOperator: gray05,
-		updateOperator: gray05,
-		definitionOperator: gray05,
-		typeOperator: gray05,
-		controlOperator: gray05,
-		punctuation: white,
-		separator: white,
-		bracket: white,
-		angleBracket: white,
-		squareBracket: white,
-		paren: white,
-		brace: white,
-		content: white,
-		heading: white,
-		heading1: orange,
-		heading2: yellow,
-		heading3: darkRed,
-		heading4: gray,
-		heading5: purple,
-		heading6: darkGreen,
-		contentSeparator: null,
-		list: null,
-		quote: darkGreen,
-		emphasis: white,
-		strong: white,
-		link: null,
-		monospace: null,
-		strikethrough: null,
-		inserted: null,
-		deleted: null,
-		changed: null,
-		invalid: null,
-		meta: null,
-		documentMeta: null,
-		annotation: null,
-		processingInstruction: orange,
-		definition: null,
-		constant: lightBlue,
-		function: yellow,
-		standard: null,
-		local: null,
-		special: green
+schemes.push(...[...Array(localStorage.length).keys()]
+	.map(i => localStorage.key(i)!)
+	.filter(k => k.startsWith(schemeKey("")))
+	.map(k => JSON.parse(localStorage.getItem(k)!) as InternalScheme)
+);
+
+function addSchemes() {
+	schemes.sort((a, b) => a.name.localeCompare(b.name));
+	children(defaultGroup).concat(children(customGroup)).forEach(o => o.remove());
+
+	for (const scheme of schemes) {
+		const option = document.createElement("option");
+		option.value = option.innerText = scheme.name;
+		(scheme.default ? defaultGroup : customGroup).append(option);
 	}
-};
+}
 
-const compartment = new cms.Compartment;
+addSchemes();
+
+const inputs = map({...editorSchema, ...tags}, () => ({
+	hex: document.createElement("input"),
+	color: document.createElement("input"),
+	setColor() {
+		// @ts-ignore
+		const {hex, color} = this;
+		color.value = hex.value.length == 4 ? "#" + [...hex.value.substring(1)].map(c => c + c).join("") : hex.value
+	}
+}));
+
+let scheme: InternalScheme;
+
+function editScheme(copy: boolean = false, rename?: string) {
+	if (copy || scheme.default) schemes.push(scheme = {
+		...window.structuredClone(scheme),
+		name: rename ?? incrementCounter(scheme.name),
+		default: false
+	}); else if (rename == null) return scheme;
+	else scheme.name = rename!;
+
+	addSchemes();
+	setScheme(scheme.name);
+}
+
+const languageCompartment = new cms.Compartment;
+const schemeCompartment = new cms.Compartment;
 
 const view = new cmv.EditorView({
 	parent: document.body,
 	extensions: [
-		compartment.of([]),
+		languageCompartment.of([]),
+		schemeCompartment.of([]),
 		cml.indentUnit.of("\t"),
 		cmv.keymap.of([cmc.indentWithTab]),
 		cmv.EditorView.updateListener.of(u => {
@@ -172,7 +131,17 @@ const view = new cmv.EditorView({
 
 view.focus();
 
-window.setFontFamily = async () => {
+function incrementCounter(name: string) {
+	const counter = /( \d*)?$/;
+	let base = name.replace(counter, " ");
+	base += schemes.map(s1 => s1.name.match(counter))
+		.filter(m => m?.index == base.length - 1)
+		.map(m => Number(m![0]))
+		.sort().at(-1)! + 1;
+	return base;
+}
+
+async function setFontFamily() {
 	fontFamily.value = fontFamily.value.trim();
 	localStorage.setItem(FONT, fontFamily.value);
 	const style = $(".cm-scroller")!.style;
@@ -190,26 +159,76 @@ window.setFontFamily = async () => {
 	}
 
 	style.fontFamily = fontFamily.value + (fontFamily.value && ", ") + "monospace";
-};
+}
 
-window.setFontSize = () => {
+function setFontSize() {
 	fontSize.value = fontSize.value.replaceAll(/[^\d]/g, "");
 	localStorage.setItem(FONT_SIZE, fontSize.value);
 	if (fontSize.value.length) $(".cm-content")!.style.fontSize = fontSize.value + "px";
-};
+}
 
-window.setLanguage = async () => {
+async function setLanguage() {
 	const {value} = languageSelect;
 	localStorage.setItem(LANGUAGE, value);
 	const doc = localStorage.getItem(previewKey()) || await fetch(previewKey()).then(r => r.text()).catch(_ => "");
-	// @ts-ignore
-	view.dispatch({changes: [{from: 0, to: view.state.doc.length, insert: doc}]})
+
+	view.dispatch({
+		changes: [{from: 0, to: view.state.doc.length, insert: doc}],
+		effects: languageCompartment.reconfigure(await languages.find(l => l.alias.includes(languageSelect.value))!.load())
+	})
+}
+
+function setScheme(name?: string) {
+	if (name != null) schemeSelect.value = name;
+	if (!schemeSelect.value) schemeSelect.value = "Darcula";
+
+	scheme = schemes.find(s => s.name == schemeSelect.value)!;
+	localStorage.setItem(SCHEME, schemeSelect.value);
+	toggleSchemeInput(true);
+	removeSchemeButton.disabled = scheme.default;
+}
+
+function loadScheme() {
+	setScheme();
+
+	for (const [name, color] of Object.entries({...scheme.editor, ...scheme.syntax})) {
+		const input = inputs[name];
+		input.hex.value = color ?? "";
+		input.setColor();
+	}
+
 	applyHighlighting();
 }
 
-async function applyHighlighting() {
-	view.dispatch({effects: compartment.reconfigure([
-		await languages.find(l => l.alias.includes(languageSelect.value))!.load(),
+function saveScheme() {
+	localStorage.setItem(schemeKey(), JSON.stringify(scheme));
+}
+
+function removeScheme() {
+	// @ts-ignore
+	const option = children(defaultGroup).concat(children(customGroup)).find(s1 => s1.value == scheme.name) as HTMLOptionElement;
+	// @ts-ignore
+	schemeSelect.value = (option.nextElementSibling ?? option.previousElementSibling)?.value;
+	option.remove();
+
+	schemes.splice(schemes.indexOf(scheme), 1);
+	localStorage.removeItem(schemeKey(scheme.name));
+
+	loadScheme();
+}
+
+function toggleSchemeInput(select: boolean = schemeName.type == "text") {
+	schemeName.type = select ? "hidden" : "text";
+	schemeSelect.style.display = select ? "block" : "none";
+
+	if (!select) {
+		schemeName.value = schemeSelect.value;
+		focusEnd(schemeName);
+	}
+}
+
+function applyHighlighting() {
+	view.dispatch({effects: schemeCompartment.reconfigure([
 		cmv.EditorView.theme({
 			"&, .cm-gutters": {
 				background: scheme.editor.background
@@ -221,7 +240,6 @@ async function applyHighlighting() {
 				background: scheme.editor.selection
 			}
 		}, {dark: true}),
-		// @ts-ignore
 		cml.syntaxHighlighting(cml.HighlightStyle.define(Object.entries(scheme.syntax).map(([name, color]) => ({tag: tags[name], color}))))
 	])});
 }
@@ -237,60 +255,83 @@ for (const language of languages.sort((a, b) => a.name.localeCompare(b.name))) {
 	languageSelect.appendChild(option);
 }
 
-languageSelect.value = localStorage.getItem(LANGUAGE) ?? "cpp";
-languageSelect.oninput = window.setLanguage;
-
 fontFamily.value = localStorage.getItem(FONT) ?? "";
 fontSize.value = localStorage.getItem(FONT_SIZE) ?? fontSize.value;
-window.setFontFamily();
-window.setFontSize();
-window.setLanguage();
+languageSelect.value = localStorage.getItem(LANGUAGE) ?? "cpp";
+schemeSelect.value = localStorage.getItem(SCHEME)!;
 
-const colorList = $("#colors")!;
-const hexInputs: HTMLInputElement[] = [];
+fontFamily.onchange = setFontFamily;
+fontSize.oninput = setFontSize;
+languageSelect.oninput = setLanguage;
+schemeSelect.onchange = loadScheme;
 
-for (const set of Object.values(scheme)) {
-	for (const name in set) {
-		const hex = document.createElement("input");
-		hex.type = "text";
-		hex.value = set[name] ?? "";
+copySchemeButton.onclick = () => {
+	editScheme(true);
+	saveScheme();
+	toggleSchemeInput(false);
+};
 
-		const index = hexInputs.length;
-		hexInputs.push(hex);
+renameSchemeButton.onclick = () => toggleSchemeInput();
+removeSchemeButton.onclick = removeScheme;
 
-		const color = document.createElement("input");
-		const setColor = () => color.value = hex.value.length == 4 ? "#" + [...hex.value.substring(1)].map(c => c + c).join("") : hex.value;
-		color.type = "color";
-		setColor();
+schemeName.onblur = _ => toggleSchemeInput(true);
 
-		hex.oninput = _ => {
-			const value = hex.value.trim();
-			hex.value = value.replace(/^#*/, "#").substring(0, 7);
-			setColor();
-			set[name] = hex.value;
+schemeName.onkeydown = e => {
+	if (e.key in ["Enter", "Escape"]) toggleSchemeInput(true)
+};
+
+schemeName.onchange = _ => {
+	let name = schemeName.value = schemeName.value.trim();
+	if (schemes.find(s => s.name == name)) name = incrementCounter(name);
+
+	localStorage.removeItem(schemeKey());
+	editScheme(false, name);
+	saveScheme();
+};
+
+setFontFamily();
+setFontSize();
+setLanguage();
+loadScheme();
+
+const colorList = $("#colors");
+
+for (const [i, [name, entry]] of Object.entries(inputs).entries()) {
+	const {hex, color} = entry;
+	color.type = "color";
+
+	function set(name: string, value: string) {
+		if ((scheme.editor[name] ?? scheme.syntax[name]) != (hex.value = value)) {
+			editScheme();
+			(scheme.editor[name] == undefined ? scheme.syntax : scheme.editor)[name] = hex.value;
+			saveScheme();
 			applyHighlighting();
-		};
-
-		hex.onkeydown = e => {
-			const target =
-				e.key == "ArrowDown" ? hexInputs[index + 1]
-				: e.key == "ArrowUp" ? hexInputs[index - 1]
-				: null;
-
-			if (target) {
-				target.focus();
-				target.selectionStart = target.selectionEnd = target.value.length;
-				return false;
-			}
-		};
-
-		color.oninput = _ => {
-			hex.value = color.value;
-			set[name] = hex.value;
-			applyHighlighting();
-		};
-
-		colorList.append(document.createTextNode(name.replaceAll(/(?<=[a-z])[A-Z\d]/g, m => " " + m[0].toLowerCase())));
-		colorList.append(hex, color);
+		}
 	}
+
+	hex.oninput = _ => {
+		set(name, hex.value.trim().replace(/^#*/, "#").substring(0, 7));
+		entry.setColor();
+	};
+
+	hex.onkeydown = e => {
+		const target =
+			e.key == "ArrowDown" ? Object.values(inputs)[i + 1]
+			: e.key == "ArrowUp" ? Object.values(inputs)[i - 1]
+			: null;
+
+		if (target) {
+			focusEnd(target.hex);
+			return false;
+		}
+	};
+
+	color.oninput = _ => set(name, color.value);
+
+	const span = document.createElement("span");
+	span.append(hex, color);
+	colorList.append(document.createTextNode(name.replaceAll(/(?<=[a-z])[A-Z\d]/g, m => " " + m[0].toLowerCase())));
+	colorList.append(span);
 }
+
+document.body.style.visibility = "visible";

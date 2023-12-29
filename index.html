@@ -14,44 +14,77 @@
 			display: flex;
 			background: #121212;
 			color: #afbfbf;
+			visibility: hidden;
 		}
 
 		:focus-visible {outline: 2px solid}
 
-		input, select {
+		button, input, select {
 			background: inherit;
 			color: inherit;
 			padding: 0.3em;
 			border: 1px solid;
-			justify-self: end;
+			box-sizing: border-box;
 		}
 
 		#options {
+			display: grid;
+			grid-template-columns: auto 1fr;
 			height: 100%;
-			overflow: auto;
+			/* TODO: `overflow-y: auto` makes x scrollbar visible */
+			overflow: auto scroll;
 			box-sizing: border-box;
-			margin: 0;
 			padding: 1em;
-			scroll-margin: 0;
 		}
 
 		#colors, #editor {
 			display: grid;
+			grid-column: span 2;
+			grid-template-columns: subgrid;
 			row-gap: 0.25em;
 			column-gap: 1em;
 			white-space: nowrap;
 		}
 
 		#editor {
-			grid-template-columns: auto auto;
 			margin-bottom: 2.5em;
+
+			& span {
+				display: flex;
+				gap: 0.25em;
+
+				select, input {flex-grow: 1}
+				input {width: 0}
+
+				& button {
+					line-height: 100%;
+					font-size: 150%;
+					width: 1.2em;
+					height: 1.2em;
+					padding: 0;
+					user-select: none;
+					flex-shrink: 0;
+
+					&:not([disabled]) {cursor: pointer}
+				}
+
+				#remove-scheme {
+					font-size: 100%;
+					height: 100%;
+					width: 1.8em;
+				}
+			}
 		}
 
-		#colors {
-			grid-template-columns: auto auto auto;
-
-			& input[type=text] {width: 7em}
-			& input[type=color] {border: none}
+		#colors input {
+			vertical-align: middle;
+		
+			&[type=text] {width: 7em}
+			&[type=color] {
+				height: 100%;
+				border: none;
+				padding: 0 0 0 0.3em;
+			}
 		}
 
 		.cm-editor {
@@ -60,7 +93,7 @@
 
 			.cm-activeLine,
 			.cm-activeLineGutter {
-				background: #323232
+				background: #323232;
 			}
 
 			.cm-gutters {
@@ -74,9 +107,19 @@
 <body>
 	<div id=options>
 		<section id=editor>
-			font family <input id=font-family type=text placeholder="Fira Mono" list=fonts onfocus=this.showPicker() onchange=setFontFamily()>
-			font size <input id=font-size type=number value=16 min=1 oninput=setFontSize()>
+			font family <input id=font-family type=text placeholder="Fira Mono" list=fonts onfocus=this.showPicker()>
+			font size <input id=font-size type=number value=16 min=1>
 			language <select id=language></select>
+			scheme <span>
+				<select id=scheme>
+					<optgroup label=default></optgroup>
+					<optgroup label=custom></optgroup>
+				</select>
+				<input id=scheme-name type=hidden>
+				<button id=copy-scheme>+</button>
+				<button id=rename-scheme>✎</button>
+				<button id=remove-scheme>⌫</button>
+			</span>
 
 			<datalist id=fonts>
 				<option value="Anonymous Pro"></option>
